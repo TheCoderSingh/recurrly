@@ -13,12 +13,14 @@ import {
 } from "react-native";
 
 const SignIn = () => {
-  const { signIn, errors, fetchStatus } = useSignIn();
+  const { signIn, fetchStatus } = useSignIn();
   const router = useRouter();
 
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
+  const [mfaCode, setMfaCode] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const [showMfaInput, setShowMfaInput] = useState(false);
 
   const onSignInPress = async () => {
     setErrorMsg("");
@@ -34,7 +36,9 @@ const SignIn = () => {
       });
 
       if (error) {
-        console.error(JSON.stringify(error, null, 2));
+        if (__DEV__) {
+          console.error(JSON.stringify(error, null, 2));
+        }
         setErrorMsg(error.message || "Sign in failed.");
         return;
       }
@@ -49,13 +53,58 @@ const SignIn = () => {
             router.replace("/(tabs)");
           },
         });
+      } else if (signIn.status === "needs_second_factor") {
+        try {
+          await signIn.mfa.sendEmailCode();
+          setShowMfaInput(true);
+          setErrorMsg("");
+        } catch (mfaError: any) {
+          setErrorMsg(mfaError.message || "Failed to send MFA code.");
+        }
+      } else if (signIn.status === "needs_client_trust") {
+        try {
+          await signIn.mfa.sendEmailCode();
+          setShowMfaInput(true);
+          setErrorMsg("");
+        } catch (trustError: any) {
+          setErrorMsg(trustError.message || "Failed to send verification code.");
+        }
       } else {
-        console.error(JSON.stringify(signIn, null, 2));
         setErrorMsg("Additional verification needed.");
       }
     } catch (err: any) {
-      console.error(JSON.stringify(err, null, 2));
+      if (__DEV__) {
+        console.error(JSON.stringify(err, null, 2));
+      }
       setErrorMsg(err.errors?.[0]?.message || "Something went wrong.");
+    }
+  };
+
+  const onVerifyMfaPress = async () => {
+    setErrorMsg("");
+    if (!mfaCode) {
+      setErrorMsg("Please enter the MFA code.");
+      return;
+    }
+
+    try {
+      await signIn.mfa.attemptSecondFactor({ code: mfaCode });
+
+      if (signIn.status === "complete") {
+        await signIn.finalize({
+          navigate: ({ session, decorateUrl }) => {
+            if (session?.currentTask) {
+              console.log(session?.currentTask);
+              return;
+            }
+            router.replace("/(tabs)");
+          },
+        });
+      } else {
+        setErrorMsg("MFA verification incomplete.");
+      }
+    } catch (err: any) {
+      setErrorMsg(err.errors?.[0]?.message || "Invalid MFA code.");
     }
   };
 
@@ -104,47 +153,80 @@ const SignIn = () => {
                 </Text>
               </View>
             ) : null}
-            <View className="mb-5">
-              <Text className="text-[#081126] font-sans-semibold text-base mb-2">
-                Email
-              </Text>
-              <TextInput
-                autoCapitalize="none"
-                value={emailAddress}
-                placeholder="Enter your email"
-                className="w-full bg-muted rounded-xl px-4 py-4 text-[#081126] font-sans-regular text-base border-transparent focus:border-accent border"
-                placeholderTextColor="rgba(0, 0, 0, 0.4)"
-                onChangeText={setEmailAddress}
-                keyboardType="email-address"
-                editable={!loading}
-              />
-            </View>
-            <View className="mb-6">
-              <Text className="text-[#081126] font-sans-semibold text-base mb-2">
-                Password
-              </Text>
-              <TextInput
-                value={password}
-                placeholder="Enter your password"
-                className="w-full bg-muted rounded-xl px-4 py-4 text-[#081126] font-sans-regular text-base border-transparent focus:border-accent border"
-                secureTextEntry={true}
-                placeholderTextColor="rgba(0, 0, 0, 0.4)"
-                onChangeText={setPassword}
-                editable={!loading}
-              />
-            </View>
-            <TouchableOpacity
-              onPress={onSignInPress}
-              disabled={loading}
-              className={`w-full bg-accent py-4 rounded-xl items-center flex-row justify-center ${loading ? "opacity-70" : ""}`}
-            >
-              {loading ? (
-                <ActivityIndicator color="white" className="mr-2" />
-              ) : null}
-              <Text className="text-white font-sans-semibold text-lg">
-                Sign in
-              </Text>
-            </TouchableOpacity>
+            {showMfaInput ? (
+              <>
+                <View className="mb-6">
+                  <Text className="text-[#081126] font-sans-semibold text-base mb-2">
+                    MFA Code
+                  </Text>
+                  <TextInput
+                    value={mfaCode}
+                    placeholder="Enter MFA code"
+                    className="w-full bg-muted rounded-xl px-4 py-4 text-[#081126] font-sans-regular text-base border-transparent focus:border-accent border"
+                    placeholderTextColor="rgba(0, 0, 0, 0.4)"
+                    onChangeText={setMfaCode}
+                    keyboardType="numeric"
+                    editable={!loading}
+                  />
+                </View>
+                <TouchableOpacity
+                  onPress={onVerifyMfaPress}
+                  disabled={loading}
+                  className={`w-full bg-accent py-4 rounded-xl items-center flex-row justify-center ${loading ? "opacity-70" : ""}`}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="white" className="mr-2" />
+                  ) : null}
+                  <Text className="text-white font-sans-semibold text-lg">
+                    Verify MFA
+                  </Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <View className="mb-5">
+                  <Text className="text-[#081126] font-sans-semibold text-base mb-2">
+                    Email
+                  </Text>
+                  <TextInput
+                    autoCapitalize="none"
+                    value={emailAddress}
+                    placeholder="Enter your email"
+                    className="w-full bg-muted rounded-xl px-4 py-4 text-[#081126] font-sans-regular text-base border-transparent focus:border-accent border"
+                    placeholderTextColor="rgba(0, 0, 0, 0.4)"
+                    onChangeText={setEmailAddress}
+                    keyboardType="email-address"
+                    editable={!loading}
+                  />
+                </View>
+                <View className="mb-6">
+                  <Text className="text-[#081126] font-sans-semibold text-base mb-2">
+                    Password
+                  </Text>
+                  <TextInput
+                    value={password}
+                    placeholder="Enter your password"
+                    className="w-full bg-muted rounded-xl px-4 py-4 text-[#081126] font-sans-regular text-base border-transparent focus:border-accent border"
+                    secureTextEntry={true}
+                    placeholderTextColor="rgba(0, 0, 0, 0.4)"
+                    onChangeText={setPassword}
+                    editable={!loading}
+                  />
+                </View>
+                <TouchableOpacity
+                  onPress={onSignInPress}
+                  disabled={loading}
+                  className={`w-full bg-accent py-4 rounded-xl items-center flex-row justify-center ${loading ? "opacity-70" : ""}`}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="white" className="mr-2" />
+                  ) : null}
+                  <Text className="text-white font-sans-semibold text-lg">
+                    Sign in
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
             <View className="flex-row items-center justify-center mt-6">
               <Text className="font-sans-regular text-[#081126]/60 text-base">
                 New to Recurrly?{" "}
