@@ -13,7 +13,7 @@ import {
 } from "react-native";
 
 const SignUp = () => {
-  const { signUp, errors, fetchStatus } = useSignUp();
+  const { signUp, fetchStatus } = useSignUp();
   const router = useRouter();
 
   const [emailAddress, setEmailAddress] = useState("");
@@ -37,14 +37,18 @@ const SignUp = () => {
       });
 
       if (error) {
-        console.error(JSON.stringify(error, null, 2));
+        if (__DEV__) {
+          console.error(JSON.stringify(error, null, 2));
+        }
         setErrorMsg(error.message || "Sign up failed");
         return;
       }
 
       await signUp.verifications.sendEmailCode();
     } catch (err: any) {
-      console.error(JSON.stringify(err, null, 2));
+      if (__DEV__) {
+        console.error(JSON.stringify(err, null, 2));
+      }
       setErrorMsg(err.errors?.[0]?.message || "Something went wrong.");
     }
   };
@@ -70,11 +74,15 @@ const SignUp = () => {
           },
         });
       } else {
-        console.error(JSON.stringify(signUp, null, 2));
+        if (__DEV__) {
+          console.error(JSON.stringify(signUp, null, 2));
+        }
         setErrorMsg("Sign up attempt not complete");
       }
     } catch (err: any) {
-      console.error(JSON.stringify(err, null, 2));
+      if (__DEV__) {
+        console.error(JSON.stringify(err, null, 2));
+      }
       setErrorMsg(err.errors?.[0]?.message || "Invalid code.");
     }
   };
@@ -99,7 +107,7 @@ const SignUp = () => {
                 Verify email
               </Text>
               <Text className="text-base font-sans-regular text-gray-600 text-center">
-                We've sent a verification code to {emailAddress}
+                We&apos;ve sent a verification code to {emailAddress}
               </Text>
             </View>
 
@@ -140,7 +148,17 @@ const SignUp = () => {
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => signUp.verifications.sendEmailCode()}
+                onPress={async () => {
+                  try {
+                    await signUp.verifications.sendEmailCode();
+                    setErrorMsg("");
+                  } catch (err: any) {
+                    if (__DEV__) {
+                      console.error(err);
+                    }
+                    setErrorMsg(err.errors?.[0]?.message || "Failed to resend code.");
+                  }
+                }}
                 disabled={loading}
                 className="mt-4"
               >
@@ -228,6 +246,8 @@ const SignUp = () => {
                 editable={!loading}
               />
             </View>
+
+            <View nativeID="clerk-captcha" className="mb-4" />
 
             <TouchableOpacity
               onPress={onSignUpPress}
