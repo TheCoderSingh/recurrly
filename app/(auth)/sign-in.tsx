@@ -67,7 +67,9 @@ const SignIn = () => {
           setShowMfaInput(true);
           setErrorMsg("");
         } catch (trustError: any) {
-          setErrorMsg(trustError.message || "Failed to send verification code.");
+          setErrorMsg(
+            trustError.message || "Failed to send verification code.",
+          );
         }
       } else {
         setErrorMsg("Additional verification needed.");
@@ -88,7 +90,7 @@ const SignIn = () => {
     }
 
     try {
-      await signIn.mfa.attemptSecondFactor({ code: mfaCode });
+      await signIn.mfa.verifyEmailCode({ code: mfaCode });
 
       if (signIn.status === "complete") {
         await signIn.finalize({
