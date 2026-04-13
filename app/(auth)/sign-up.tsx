@@ -1,6 +1,7 @@
 import { useSignUp } from "@clerk/expo";
 import { Link, useRouter } from "expo-router";
 import React, { useState } from "react";
+import { usePostHog } from "posthog-react-native";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -15,6 +16,7 @@ import {
 const SignUp = () => {
   const { signUp, fetchStatus } = useSignUp();
   const router = useRouter();
+  const posthog = usePostHog();
 
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
@@ -40,6 +42,9 @@ const SignUp = () => {
         if (__DEV__) {
           console.error(JSON.stringify(error, null, 2));
         }
+        posthog.capture("user_sign_up_failed", {
+          error_message: error.message,
+        });
         setErrorMsg(error.message || "Sign up failed");
         return;
       }
@@ -49,6 +54,9 @@ const SignUp = () => {
       if (__DEV__) {
         console.error(JSON.stringify(err, null, 2));
       }
+      posthog.capture("user_sign_up_failed", {
+        error_message: err.errors?.[0]?.message,
+      });
       setErrorMsg(err.errors?.[0]?.message || "Something went wrong.");
     }
   };
@@ -70,6 +78,11 @@ const SignUp = () => {
               console.log(session?.currentTask);
               return;
             }
+            posthog.identify(emailAddress, {
+              $set: { email: emailAddress },
+              $set_once: { signup_date: new Date().toISOString() },
+            });
+            posthog.capture("user_signed_up", { method: "email" });
             router.replace("/(tabs)");
           },
         });
@@ -83,6 +96,10 @@ const SignUp = () => {
       if (__DEV__) {
         console.error(JSON.stringify(err, null, 2));
       }
+      posthog.capture("user_sign_up_failed", {
+        error_message: err.errors?.[0]?.message,
+        stage: "email_verification",
+      });
       setErrorMsg(err.errors?.[0]?.message || "Invalid code.");
     }
   };

@@ -1,9 +1,11 @@
 import "@/global.css";
 import { ClerkLoaded, ClerkProvider } from "@clerk/expo";
 import { useFonts } from "expo-font";
-import { SplashScreen, Stack } from "expo-router";
-import { useEffect } from "react";
+import { SplashScreen, Stack, usePathname, useGlobalSearchParams } from "expo-router";
+import { useEffect, useRef } from "react";
+import { PostHogProvider } from "posthog-react-native";
 import { tokenCache } from "../lib/auth";
+import { posthog } from "../src/config/posthog";
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
 
@@ -14,6 +16,20 @@ if (!publishableKey) {
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  const pathname = usePathname();
+  const params = useGlobalSearchParams();
+  const previousPathname = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (previousPathname.current !== pathname) {
+      posthog.screen(pathname, {
+        previous_screen: previousPathname.current ?? null,
+        ...params,
+      });
+      previousPathname.current = pathname;
+    }
+  }, [pathname, params]);
+
   const [fontsLoaded] = useFonts({
     "sans-light": require("../assets/fonts/PlusJakartaSans-Light.ttf"),
     "sans-regular": require("../assets/fonts/PlusJakartaSans-Regular.ttf"),
@@ -34,10 +50,19 @@ export default function RootLayout() {
   }
 
   return (
-    <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-      <ClerkLoaded>
-        <Stack screenOptions={{ headerShown: false }} />
-      </ClerkLoaded>
-    </ClerkProvider>
+    <PostHogProvider
+      client={posthog}
+      autocapture={{
+        captureScreens: false,
+        captureTouches: true,
+        propsToCapture: ["testID"],
+      }}
+    >
+      <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+        <ClerkLoaded>
+          <Stack screenOptions={{ headerShown: false }} />
+        </ClerkLoaded>
+      </ClerkProvider>
+    </PostHogProvider>
   );
 }

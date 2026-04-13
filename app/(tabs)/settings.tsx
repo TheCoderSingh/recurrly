@@ -2,12 +2,20 @@ import { Text, TouchableOpacity } from "react-native";
 
 import { useAuth } from "@clerk/expo";
 import { styled } from "nativewind";
+import { usePostHog } from "posthog-react-native";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
 
 const SafeAreaView = styled(RNSafeAreaView);
 
 const Settings = () => {
   const { signOut } = useAuth();
+  const posthog = usePostHog();
+
+  const handleSignOut = () => {
+    posthog.capture("user_signed_out");
+    posthog.reset();
+    signOut();
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-background p-5">
@@ -16,7 +24,7 @@ const Settings = () => {
       </Text>
 
       <TouchableOpacity
-        onPress={() => signOut()}
+        onPress={handleSignOut}
         className="w-full bg-destructive/10 py-4 rounded-xl items-center flex-row justify-center border border-destructive/20"
       >
         <Text className="text-destructive font-sans-semibold text-lg">

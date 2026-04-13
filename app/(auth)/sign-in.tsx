@@ -1,6 +1,7 @@
 import { useSignIn } from "@clerk/expo";
 import { Link, useRouter } from "expo-router";
 import { useState } from "react";
+import { usePostHog } from "posthog-react-native";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -15,6 +16,7 @@ import {
 const SignIn = () => {
   const { signIn, fetchStatus } = useSignIn();
   const router = useRouter();
+  const posthog = usePostHog();
 
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
@@ -39,6 +41,9 @@ const SignIn = () => {
         if (__DEV__) {
           console.error(JSON.stringify(error, null, 2));
         }
+        posthog.capture("user_sign_in_failed", {
+          error_message: error.message,
+        });
         setErrorMsg(error.message || "Sign in failed.");
         return;
       }
@@ -50,12 +55,17 @@ const SignIn = () => {
               console.log(session?.currentTask);
               return;
             }
+            posthog.identify(emailAddress, {
+              $set: { email: emailAddress },
+            });
+            posthog.capture("user_signed_in", { method: "password" });
             router.replace("/(tabs)");
           },
         });
       } else if (signIn.status === "needs_second_factor") {
         try {
           await signIn.mfa.sendEmailCode();
+          posthog.capture("mfa_verification_started", { type: "second_factor" });
           setShowMfaInput(true);
           setErrorMsg("");
         } catch (mfaError: any) {
@@ -64,6 +74,7 @@ const SignIn = () => {
       } else if (signIn.status === "needs_client_trust") {
         try {
           await signIn.mfa.sendEmailCode();
+          posthog.capture("mfa_verification_started", { type: "client_trust" });
           setShowMfaInput(true);
           setErrorMsg("");
         } catch (trustError: any) {
@@ -78,6 +89,9 @@ const SignIn = () => {
       if (__DEV__) {
         console.error(JSON.stringify(err, null, 2));
       }
+      posthog.capture("user_sign_in_failed", {
+        error_message: err.errors?.[0]?.message,
+      });
       setErrorMsg(err.errors?.[0]?.message || "Something went wrong.");
     }
   };
@@ -99,6 +113,10 @@ const SignIn = () => {
               console.log(session?.currentTask);
               return;
             }
+            posthog.identify(emailAddress, {
+              $set: { email: emailAddress },
+            });
+            posthog.capture("user_signed_in", { method: "mfa" });
             router.replace("/(tabs)");
           },
         });
