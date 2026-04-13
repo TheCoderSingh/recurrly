@@ -64,7 +64,6 @@ export default function CreateSubscriptionModal({
       id: name.toLowerCase().replace(/ /g, "-") + "-" + Date.now(),
       name: name.trim(),
       price: numPrice,
-      frequency,
       billing: frequency,
       category,
       status: "active",
