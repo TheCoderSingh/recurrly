@@ -118,8 +118,7 @@ export default function App() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onAdd={(sub) => {
-          HOME_SUBSCRIPTIONS.unshift(sub);
-          setSubscriptions([...HOME_SUBSCRIPTIONS]);
+          setSubscriptions((prev) => [sub, ...prev]);
         }}
       />
     </SafeAreaView>
